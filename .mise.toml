@@ -1,0 +1,93 @@
+# mise configuration for mise-doxygen plugin development and testing
+
+[tasks.test-list]
+description = "Test listing available versions"
+run = '''
+#!/usr/bin/env bash
+set -euo pipefail
+
+echo "Linking plugin for testing..."
+mise plugin link doxygen . || true
+
+echo ""
+echo "Fetching available versions..."
+mise ls-remote doxygen | head -20
+
+echo ""
+echo "✓ Successfully listed versions"
+'''
+
+[tasks.test-install]
+description = "Test installation of doxygen"
+run = '''
+#!/usr/bin/env bash
+set -euo pipefail
+
+VERSION="${1:-1.13.0}"
+
+echo "Linking plugin for testing..."
+mise plugin link doxygen . || true
+
+echo ""
+echo "Installing doxygen ${VERSION}..."
+mise install doxygen@${VERSION}
+
+echo ""
+echo "Testing installation..."
+mise exec doxygen@${VERSION} -- doxygen --version
+
+echo ""
+echo "✓ Installation successful!"
+'''
+
+[tasks.test-cleanup]
+description = "Clean up test installations"
+run = '''
+#!/usr/bin/env bash
+set -euo pipefail
+
+echo "Removing test installations..."
+mise uninstall doxygen --all || true
+
+echo "Unlinking plugin..."
+mise plugin unlink doxygen || true
+
+echo ""
+echo "✓ Cleanup complete"
+'''
+
+[tasks.lint]
+description = "Run luacheck on Lua files"
+run = '''
+#!/usr/bin/env bash
+set -euo pipefail
+
+if ! command -v luacheck &> /dev/null; then
+    echo "luacheck not found. Install with: luarocks install luacheck"
+    exit 1
+fi
+
+echo "Running luacheck..."
+luacheck metadata.lua hooks/ lib/ --globals PLUGIN RUNTIME
+
+echo ""
+echo "✓ Linting passed"
+'''
+
+[tasks.format]
+description = "Format Lua files with stylua"
+run = '''
+#!/usr/bin/env bash
+set -euo pipefail
+
+if ! command -v stylua &> /dev/null; then
+    echo "stylua not found. Install from: https://github.com/JohnnyMorganz/StyLua"
+    exit 1
+fi
+
+echo "Formatting Lua files..."
+stylua metadata.lua hooks/ lib/
+
+echo ""
+echo "✓ Formatting complete"
+'''
