@@ -7,66 +7,64 @@ function PLUGIN:PostInstall(ctx)
     local helper = require("lib.helper")
     local cmd = require("cmd")
 
-    print("Building doxygen " .. version .. " from source...")
+    print("\n🔨 Building doxygen " .. version .. " from source...")
 
     -- Set up PATH for macOS Homebrew tools if needed
     local extra_path = helper.get_homebrew_build_tools_path()
     local build_env = ""
     if extra_path ~= "" then
         build_env = "PATH=" .. extra_path .. "$PATH "
-        print("Using Homebrew bison/flex from: " .. extra_path:gsub(":$", ""))
+        print("   Using Homebrew bison/flex")
     end
 
     -- Get parallel jobs count
     local jobs = helper.get_parallel_jobs()
-    print("Using " .. jobs .. " parallel jobs for compilation")
+    print("   Using " .. jobs .. " parallel jobs")
 
     -- Get compiler flags
     local cxx_flags = helper.get_cxx_flags()
 
     -- Create build directory
     local build_dir = path .. "/build"
-    local result = os.execute("mkdir -p " .. build_dir)
-    if result ~= 0 then
-        error("Failed to create build directory")
-    end
+    os.execute("mkdir -p " .. build_dir .. " 2>&1")
 
     -- Run CMake configuration
-    print("Configuring with CMake...")
+    print("\n⚙️  Configuring with CMake...")
     local cmake_cmd = build_env .. "cmake -G \"Unix Makefiles\" " ..
         "-DCMAKE_INSTALL_PREFIX=\"" .. path .. "\" " ..
         "-DCMAKE_CXX_FLAGS=\"" .. cxx_flags .. "\" " ..
         "-S \"" .. path .. "\" " ..
-        "-B \"" .. build_dir .. "\""
+        "-B \"" .. build_dir .. "\" 2>&1"
 
-    result = os.execute(cmake_cmd)
-    if result ~= 0 then
+    local cmake_output = cmd.exec(cmake_cmd)
+    if not cmake_output or cmake_output:match("CMake Error") then
+        print(cmake_output)
         error("CMake configuration failed")
     end
 
-    -- Build with make
-    print("Compiling (this may take a few minutes)...")
-    local make_cmd = build_env .. "make -C \"" .. build_dir .. "\" -j" .. jobs
-    result = os.execute(make_cmd)
-    if result ~= 0 then
+    -- Build with make (capture output, only show on error)
+    print("🏗️  Compiling (this may take a few minutes)...")
+    local make_cmd = build_env .. "make -C \"" .. build_dir .. "\" -j" .. jobs .. " 2>&1"
+    local make_output = cmd.exec(make_cmd)
+    if not make_output or make_output:match("error:") or make_output:match("Error ") then
+        print(make_output)
         error("Compilation failed")
     end
 
     -- Install
-    print("Installing...")
-    local install_cmd = build_env .. "make -C \"" .. build_dir .. "\" install"
-    result = os.execute(install_cmd)
-    if result ~= 0 then
+    print("📦 Installing...")
+    local install_cmd = build_env .. "make -C \"" .. build_dir .. "\" install 2>&1"
+    local install_output = cmd.exec(install_cmd)
+    if not install_output or install_output:match("error:") then
+        print(install_output)
         error("Installation failed")
     end
 
     -- Clean up build artifacts to save space
-    print("Cleaning up build artifacts...")
-    os.execute("rm -rf \"" .. build_dir .. "\"")
-
-    -- Remove source files that are no longer needed
+    print("🧹 Cleaning up build artifacts...")
+    os.execute("rm -rf \"" .. build_dir .. "\" 2>/dev/null")
     os.execute("find \"" .. path .. "\" -maxdepth 1 -type f -delete 2>/dev/null || true")
     os.execute("find \"" .. path .. "\" -maxdepth 1 -type d ! -name bin ! -name share ! -path \"" .. path .. "\" -exec rm -rf {} + 2>/dev/null || true")
 
-    print("doxygen " .. version .. " installed successfully!")
+    print("✅ doxygen " .. version .. " installed successfully!\n")
 end
