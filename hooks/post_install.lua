@@ -28,35 +28,44 @@ function PLUGIN:PostInstall(ctx)
     local build_dir = path .. "/build"
     os.execute("mkdir -p " .. build_dir .. " 2>&1")
 
-    -- Run CMake configuration
+    -- Run CMake configuration (suppress output, only show on error)
     print("\n⚙️  Configuring with CMake...")
     local cmake_cmd = build_env .. "cmake -G \"Unix Makefiles\" " ..
         "-DCMAKE_INSTALL_PREFIX=\"" .. path .. "\" " ..
         "-DCMAKE_CXX_FLAGS=\"" .. cxx_flags .. "\" " ..
         "-S \"" .. path .. "\" " ..
-        "-B \"" .. build_dir .. "\" 2>&1"
+        "-B \"" .. build_dir .. "\" > /dev/null 2>&1"
 
-    local cmake_output = cmd.exec(cmake_cmd)
-    if not cmake_output or cmake_output:match("CMake Error") then
-        print(cmake_output)
+    local cmake_result = os.execute(cmake_cmd)
+    if cmake_result ~= 0 then
+        -- Re-run without suppression to show the error
+        os.execute(build_env .. "cmake -G \"Unix Makefiles\" " ..
+            "-DCMAKE_INSTALL_PREFIX=\"" .. path .. "\" " ..
+            "-DCMAKE_CXX_FLAGS=\"" .. cxx_flags .. "\" " ..
+            "-S \"" .. path .. "\" " ..
+            "-B \"" .. build_dir .. "\"")
         error("CMake configuration failed")
     end
 
-    -- Build with make (capture output, only show on error)
-    print("🏗️  Compiling (this may take a few minutes)...")
-    local make_cmd = build_env .. "make -C \"" .. build_dir .. "\" -j" .. jobs .. " 2>&1"
-    local make_output = cmd.exec(make_cmd)
-    if not make_output or make_output:match("error:") or make_output:match("Error ") then
-        print(make_output)
+    -- Build with make (suppress output for clean UI)
+    print("🏗️  Compiling with " .. jobs .. " parallel jobs (this may take a few minutes)...")
+    print("    Tip: Use 'mise install --raw doxygen@version' to see build progress")
+    local make_cmd = build_env .. "make -C \"" .. build_dir .. "\" -j" .. jobs .. " > /dev/null 2>&1"
+    local make_result = os.execute(make_cmd)
+    if make_result ~= 0 then
+        -- Re-run without suppression to show the error
+        print("\n⚠️  Compilation failed. Re-running to show errors:")
+        os.execute(build_env .. "make -C \"" .. build_dir .. "\" -j" .. jobs)
         error("Compilation failed")
     end
 
-    -- Install
-    print("📦 Installing...")
-    local install_cmd = build_env .. "make -C \"" .. build_dir .. "\" install 2>&1"
-    local install_output = cmd.exec(install_cmd)
-    if not install_output or install_output:match("error:") then
-        print(install_output)
+    -- Install (suppress output, only show on error)
+    print("\n📦 Installing...")
+    local install_cmd = build_env .. "make -C \"" .. build_dir .. "\" install > /dev/null 2>&1"
+    local install_result = os.execute(install_cmd)
+    if install_result ~= 0 then
+        -- Re-run without suppression to show the error
+        os.execute(build_env .. "make -C \"" .. build_dir .. "\" install")
         error("Installation failed")
     end
 

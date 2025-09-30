@@ -83,6 +83,18 @@ doxygen -g
 doxygen Doxyfile
 ```
 
+### Installation Options
+
+By default, the build output is suppressed for a clean installation experience. If you want to see the compilation progress:
+
+```bash
+# Show detailed build output
+mise install --raw doxygen@1.13.0
+
+# Or with verbose flag
+mise install -v doxygen@1.13.0
+```
+
 ## Development
 
 This repository includes a `.mise.toml` file with tasks for plugin development and testing.
